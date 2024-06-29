@@ -26,9 +26,21 @@ impl FromStr for CommandInfo {
             "echo" => Ok(CommandInfo::Echo),
             "exit" => Ok(CommandInfo::Exit),
             "type" => Ok(CommandInfo::Type),
-            nonexistent => Err(format!("{}: not found", nonexistent))
+            _ => Err(s.to_string())
         }
     }
+}
+
+fn search_in_path_env(command: &str) -> Result<String, ()> {
+    let path_env = std::env::var("PATH").unwrap();
+    let paths = path_env.split(":");
+    for path_dir in paths {
+        let command_path = format!("{path}/{command}", path = path_dir, command = command);
+        if std::path::Path::new(&command_path).exists()  {
+            return Ok(command_path.to_string())
+        }
+    }
+    Err(())
 }
 
 fn main() {
@@ -61,12 +73,16 @@ fn main() {
                             CommandInfo::Type => {
                                 match CommandInfo::from_str(command_args) {
                                     Ok(c) => stdout.write_all(format!("{info}\r\n", info = CommandInfo::describe_command(c)).as_bytes()).unwrap(),
-                                    Err(err) => stdout.write_all(format!("{err}\r\n").as_bytes()).unwrap()
+                                    Err(command) => {
+                                        match search_in_path_env(&command) {
+                                            Ok(command_path) => stdout.write_all(format!("{command} is {command_path}\r\n").as_bytes()).unwrap(),
+                                            Err(_) => stdout.write_all(format!("{}: not found\r\n", command).as_bytes()).unwrap()
+                                        }
+                                    }
                                 };
                             }
                         }
                     }
-
                     _ => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
                 }
                 input.clear();
