@@ -7,6 +7,7 @@ enum CommandInfo {
     Echo,
     Exit,
     Type,
+    Pwd,
 }
 
 impl CommandInfo {
@@ -15,6 +16,7 @@ impl CommandInfo {
             CommandInfo::Echo => "echo is a shell builtin".to_string(),
             CommandInfo::Exit => "exit is a shell builtin".to_string(),
             CommandInfo::Type => "type is a shell builtin".to_string(),
+            CommandInfo::Pwd => "pwd is a shell builtin".to_string(),
         }
     }
 }
@@ -27,6 +29,7 @@ impl FromStr for CommandInfo {
             "echo" => Ok(CommandInfo::Echo),
             "exit" => Ok(CommandInfo::Exit),
             "type" => Ok(CommandInfo::Type),
+            "pwd" => Ok(CommandInfo::Pwd),
             _ => Err(s.to_string())
         }
     }
@@ -37,8 +40,8 @@ fn search_in_path_env(command: &str) -> Result<String, ()> {
     let paths = path_env.split(":");
     for path_dir in paths {
         let command_path = format!("{path}/{command}", path = path_dir, command = command);
-        if std::path::Path::new(&command_path).exists()  {
-            return Ok(command_path.to_string())
+        if std::path::Path::new(&command_path).exists() {
+            return Ok(command_path.to_string());
         }
     }
     Err(())
@@ -82,6 +85,10 @@ fn main() {
                                     }
                                 };
                             }
+                            CommandInfo::Pwd => {
+                                let current_dir = std::env::current_dir().unwrap();
+                                stdout.write_all(format!("{path}\r\n", path = current_dir.display().to_string()).as_bytes()).unwrap();
+                            }
                         }
                     }
                     Err(command) => {
@@ -90,10 +97,9 @@ fn main() {
                                 let executable = Command::new(command_path).stdout(Stdio::piped()).args(command_args.split(" ")).spawn().unwrap();
                                 let output = executable.wait_with_output().expect("Failed to execute a command");
                                 stdout.write_all(&output.stdout).unwrap()
-                            },
+                            }
                             Err(_) => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
                         }
-
                     }
                 }
                 input.clear();
