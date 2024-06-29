@@ -23,6 +23,10 @@ fn main() {
                 std::thread::sleep(Duration::from_secs(1))
             },
             _ => {
+                if input.trim() == "exit 0" {
+                    break;
+                }
+
                 stdout.write_all(format!("{command}: command not found\r\n", command = input.trim()).as_bytes()).unwrap();
                 input.clear();
                 print!("$ ");
