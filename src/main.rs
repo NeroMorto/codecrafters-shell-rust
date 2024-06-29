@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 enum CommandInfo {
@@ -83,7 +84,17 @@ fn main() {
                             }
                         }
                     }
-                    _ => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
+                    Err(command) => {
+                        match search_in_path_env(&command) {
+                            Ok(command_path) => {
+                                let executable = Command::new(command_path).stdout(Stdio::piped()).args(command_args.split(" ")).spawn().unwrap();
+                                let output = executable.wait_with_output().expect("Failed to execute a command");
+                                stdout.write_all(&output.stdout).unwrap()
+                            },
+                            Err(_) => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
+                        }
+
+                    }
                 }
                 input.clear();
                 print!("$ ");
