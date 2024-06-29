@@ -1,6 +1,5 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
-use std::time::Duration;
 
 fn main() {
     // Uncomment this block to pass the first stage
@@ -19,19 +18,22 @@ fn main() {
 
         stdin.read_line(&mut input).unwrap();
         match input.len() {
-            0 => {
-                std::thread::sleep(Duration::from_secs(1))
-            },
+            0 => {},
             _ => {
-                if input.trim() == "exit 0" {
-                    break;
+                let command_with_possible_args = input.trim();
+                let (command, command_args) = command_with_possible_args.trim().split_once(" ").unwrap_or((command_with_possible_args, ""));
+                match command {
+                    "echo" => stdout.write_all(format!("{command_args}\r\n").as_bytes()).unwrap(),
+                    "exit" => if command_args == "0" {
+                        break;
+                    },
+                    _ => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
                 }
-
-                stdout.write_all(format!("{command}: command not found\r\n", command = input.trim()).as_bytes()).unwrap();
                 input.clear();
                 print!("$ ");
                 io::stdout().flush().unwrap();
             }
+
         }
     }
 }
