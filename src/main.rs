@@ -10,4 +10,13 @@ fn main() {
     let stdin = io::stdin();
     let mut input = String::new();
     stdin.read_line(&mut input).unwrap();
+
+    let mut stdout = io::stdout();
+
+    match input.len() {
+        0 => {},
+        _ => {
+            stdout.write_all(format!("{command}: command not found\r\n", command = input.trim()).as_bytes()).unwrap();
+        }
+    }
 }
