@@ -1,35 +1,50 @@
-#[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
-enum CommandInfo {
+enum CommandType {
+    Builtin(BuiltinCommand),
+    External,
+}
+
+impl FromStr for CommandType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match BuiltinCommand::from_str(s) {
+            Ok(builtin) => Ok(CommandType::Builtin(builtin)),
+            Err(_) => Ok(CommandType::External)
+        }
+    }
+}
+
+enum BuiltinCommand {
     Echo,
     Exit,
     Type,
     Pwd,
 }
 
-impl CommandInfo {
-    pub fn describe_command(command: CommandInfo) -> String {
+impl BuiltinCommand {
+    pub fn describe_command(command: BuiltinCommand) -> String {
         match command {
-            CommandInfo::Echo => "echo is a shell builtin".to_string(),
-            CommandInfo::Exit => "exit is a shell builtin".to_string(),
-            CommandInfo::Type => "type is a shell builtin".to_string(),
-            CommandInfo::Pwd => "pwd is a shell builtin".to_string(),
+            BuiltinCommand::Echo => "echo is a shell builtin".to_string(),
+            BuiltinCommand::Exit => "exit is a shell builtin".to_string(),
+            BuiltinCommand::Type => "type is a shell builtin".to_string(),
+            BuiltinCommand::Pwd => "pwd is a shell builtin".to_string(),
         }
     }
 }
 
-impl FromStr for CommandInfo {
+impl FromStr for BuiltinCommand {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "echo" => Ok(CommandInfo::Echo),
-            "exit" => Ok(CommandInfo::Exit),
-            "type" => Ok(CommandInfo::Type),
-            "pwd" => Ok(CommandInfo::Pwd),
+            "echo" => Ok(BuiltinCommand::Echo),
+            "exit" => Ok(BuiltinCommand::Exit),
+            "type" => Ok(BuiltinCommand::Type),
+            "pwd" => Ok(BuiltinCommand::Pwd),
             _ => Err(s.to_string())
         }
     }
@@ -47,64 +62,86 @@ fn search_in_path_env(command: &str) -> Result<String, ()> {
     Err(())
 }
 
-fn main() {
-    // Uncomment this block to pass the first stage
+fn handle_type_command(possible_command: &str) -> String {
+    match BuiltinCommand::from_str(possible_command) {
+        Ok(c) => BuiltinCommand::describe_command(c),
+        Err(command) => {
+            match search_in_path_env(&command) {
+                Ok(command_path) => format!("{command} is {command_path}"),
+                Err(_) => format!("{command}: not found")
+            }
+        }
+    }
+}
+
+fn handle_builtin_command(builtin_command: BuiltinCommand, command_args: &str) -> Result<String, ()> {
+    match builtin_command {
+        BuiltinCommand::Echo => Ok(command_args.to_string()),
+        BuiltinCommand::Exit => {
+            if command_args == "0" {
+                return Err(());
+            }
+            Ok("".to_string())
+        }
+        BuiltinCommand::Type => {
+            Ok(handle_type_command(command_args))
+        }
+        BuiltinCommand::Pwd => {
+            let current_dir = std::env::current_dir().unwrap();
+            Ok(current_dir.display().to_string())
+        }
+    }
+}
+
+fn command_line() {
     print!("$ ");
     io::stdout().flush().unwrap();
+}
 
-    // Wait for user input
-    let stdin = io::stdin();
+
+fn main() {
     let mut input = String::new();
+    let stdin = io::stdin();
 
-
-    let mut stdout = io::stdout();
-
+    command_line();
 
     loop {
         stdin.read_line(&mut input).unwrap();
+        // Wait for user input
         match input.len() {
             0 => {}
             _ => {
                 let command_with_possible_args = input.trim();
                 let (command, command_args) = command_with_possible_args.trim().split_once(" ").unwrap_or((command_with_possible_args, ""));
-                match CommandInfo::from_str(command) {
-                    Ok(command) => {
-                        match command {
-                            CommandInfo::Echo => stdout.write_all(format!("{command_args}\r\n").as_bytes()).unwrap(),
-                            CommandInfo::Exit => if command_args == "0" {
-                                break;
+
+                match CommandType::from_str(command) {
+                    Ok(command_type) => match command_type {
+                        CommandType::Builtin(command) => match handle_builtin_command(command, command_args) {
+                            Ok(output) => {
+                                println!("{output}");
+                                io::stdout().flush().unwrap();
                             }
-                            CommandInfo::Type => {
-                                match CommandInfo::from_str(command_args) {
-                                    Ok(c) => stdout.write_all(format!("{info}\r\n", info = CommandInfo::describe_command(c)).as_bytes()).unwrap(),
-                                    Err(command) => {
-                                        match search_in_path_env(&command) {
-                                            Ok(command_path) => stdout.write_all(format!("{command} is {command_path}\r\n").as_bytes()).unwrap(),
-                                            Err(_) => stdout.write_all(format!("{}: not found\r\n", command).as_bytes()).unwrap()
-                                        }
-                                    }
-                                };
-                            }
-                            CommandInfo::Pwd => {
-                                let current_dir = std::env::current_dir().unwrap();
-                                stdout.write_all(format!("{path}\r\n", path = current_dir.display().to_string()).as_bytes()).unwrap();
-                            }
+                            Err(_) => break
                         }
-                    }
-                    Err(command) => {
-                        match search_in_path_env(&command) {
+                        CommandType::External => match search_in_path_env(&command) {
                             Ok(command_path) => {
-                                let executable = Command::new(command_path).stdout(Stdio::piped()).args(command_args.split(" ")).spawn().unwrap();
+                                let mut cmd = Command::new(command_path);
+                                cmd.stdout(Stdio::piped());
+                                if command_args.len() > 0 {
+                                    cmd.args(command_args.trim().split(" ")).spawn().unwrap();
+                                }
+                                let executable = cmd.spawn().unwrap();
                                 let output = executable.wait_with_output().expect("Failed to execute a command");
-                                stdout.write_all(&output.stdout).unwrap()
+                                print!("{}", String::from_utf8(output.stdout).unwrap())
                             }
-                            Err(_) => stdout.write_all(format!("{command}: command not found\r\n").as_bytes()).unwrap()
+                            Err(_) => println!("{command}: command not found")
                         }
                     }
+                    Err(_) => {}
                 }
+
                 input.clear();
-                print!("$ ");
-                io::stdout().flush().unwrap();
+                command_line();
             }
         }
     }
