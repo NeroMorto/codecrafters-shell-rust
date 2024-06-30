@@ -1,3 +1,4 @@
+use std::env;
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
@@ -23,6 +24,7 @@ enum BuiltinCommand {
     Exit,
     Type,
     Pwd,
+    ChangeDirectory,
 }
 
 impl BuiltinCommand {
@@ -32,6 +34,7 @@ impl BuiltinCommand {
             BuiltinCommand::Exit => "exit is a shell builtin".to_string(),
             BuiltinCommand::Type => "type is a shell builtin".to_string(),
             BuiltinCommand::Pwd => "pwd is a shell builtin".to_string(),
+            BuiltinCommand::ChangeDirectory => "cd is a shell builtin".to_string(),
         }
     }
 }
@@ -45,6 +48,7 @@ impl FromStr for BuiltinCommand {
             "exit" => Ok(BuiltinCommand::Exit),
             "type" => Ok(BuiltinCommand::Type),
             "pwd" => Ok(BuiltinCommand::Pwd),
+            "cd" => Ok(BuiltinCommand::ChangeDirectory),
             _ => Err(s.to_string())
         }
     }
@@ -90,6 +94,18 @@ fn handle_builtin_command(builtin_command: BuiltinCommand, command_args: &str) -
             let current_dir = std::env::current_dir().unwrap();
             Ok(current_dir.display().to_string())
         }
+        BuiltinCommand::ChangeDirectory => {
+            let possible_directory = std::path::Path::new(command_args);
+            match possible_directory.is_dir() && possible_directory.exists() {
+                true => {
+                    env::set_current_dir(command_args).unwrap();
+                    Ok("".to_string())
+                }
+                false => {
+                    Ok(format!("cd: {command_args}: No such file or directory"))
+                }
+            }
+        }
     }
 }
 
@@ -118,7 +134,9 @@ fn main() {
                     Ok(command_type) => match command_type {
                         CommandType::Builtin(command) => match handle_builtin_command(command, command_args) {
                             Ok(output) => {
-                                println!("{output}");
+                                if output.len() > 0 {
+                                    println!("{output}");
+                                }
                                 io::stdout().flush().unwrap();
                             }
                             Err(_) => break
