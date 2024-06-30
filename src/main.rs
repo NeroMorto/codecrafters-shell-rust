@@ -95,6 +95,11 @@ fn handle_builtin_command(builtin_command: BuiltinCommand, command_args: &str) -
             Ok(current_dir.display().to_string())
         }
         BuiltinCommand::ChangeDirectory => {
+            if command_args == "~" {
+                env::set_current_dir(env::var("HOME").unwrap()).unwrap();
+                return Ok("".to_string())
+            }
+
             let possible_directory = std::path::Path::new(command_args);
             match possible_directory.is_dir() && possible_directory.exists() {
                 true => {
