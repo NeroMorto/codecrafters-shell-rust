@@ -1,5 +1,7 @@
 use std::env;
 use std::process::exit;
+use std::str::FromStr;
+
 use crate::command::Executable;
 use crate::type_command;
 
@@ -9,19 +11,6 @@ pub enum BuiltinCommand {
     Type,
     Pwd,
     ChangeDirectory,
-}
-
-impl BuiltinCommand {
-    pub fn from_str(command: &str) -> Option<Self> {
-        match command {
-            "echo" => Some(BuiltinCommand::Echo),
-            "pwd" => Some(BuiltinCommand::Pwd),
-            "cd" => Some(BuiltinCommand::ChangeDirectory),
-            "type" => Some(BuiltinCommand::Type),
-            "exit" => Some(BuiltinCommand::Exit),
-            _ => None,
-        }
-    }
 }
 
 impl Executable for BuiltinCommand {
@@ -48,32 +37,32 @@ impl BuiltinCommand {
         }
     }
 }
-// Might be should rewrite with this variant again later
-// impl FromStr for BuiltinCommand {
-//     type Err = String;
-//
-//     fn from_str(s: &str) -> Result<Self, Self::Err> {
-//         match s {
-//             "echo" => Ok(BuiltinCommand::Echo),
-//             "exit" => Ok(BuiltinCommand::Exit),
-//             "type" => Ok(BuiltinCommand::Type),
-//             "pwd" => Ok(BuiltinCommand::Pwd),
-//             "cd" => Ok(BuiltinCommand::ChangeDirectory),
-//             _ => Err(s.to_string())
-//         }
-//     }
-// }
+
+impl FromStr for BuiltinCommand {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "echo" => Ok(BuiltinCommand::Echo),
+            "exit" => Ok(BuiltinCommand::Exit),
+            "type" => Ok(BuiltinCommand::Type),
+            "pwd" => Ok(BuiltinCommand::Pwd),
+            "cd" => Ok(BuiltinCommand::ChangeDirectory),
+            _ => Err(())
+        }
+    }
+}
 pub fn change_directory_command(args: &[String]) -> Result<String, String> {
     let path_to_change = args.get(0).map_or("~", |s| s.as_str());
     if path_to_change == "~" {
-        env::set_current_dir(env::var("HOME").unwrap()).map_err(|e| e.to_string())?;
+        env::set_current_dir(env::var("HOME").map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     } else {
         // More simple way, but is not satisfy challenge tests
         // env::set_current_dir(path_to_change).map_err(|e| e.to_string())?;
         let possible_directory = std::path::Path::new(path_to_change);
         match possible_directory.is_dir() && possible_directory.exists() {
             true => {
-                env::set_current_dir(possible_directory).unwrap();
+                env::set_current_dir(possible_directory).map_err(|e| e.to_string())?;
             }
             false => {
                 return Ok(format!("cd: {path}: No such file or directory", path = possible_directory.display()))
@@ -84,7 +73,7 @@ pub fn change_directory_command(args: &[String]) -> Result<String, String> {
 }
 
 pub fn pwd_command(_args: &[String]) -> Result<String, String> {
-    let current_dir = std::env::current_dir().unwrap();
+    let current_dir = std::env::current_dir().map_err(|e|e.to_string())?;
     Ok(current_dir.display().to_string())
 }
 

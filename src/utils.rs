@@ -1,5 +1,6 @@
 use crate::builtins::BuiltinCommand;
 use crate::command::{Executable, ExternalCommand};
+use std::str::FromStr;
 
 pub fn parse_command(input: &str) -> (String, Vec<String>) {
     let parts: Vec<&str> = input.trim().split_whitespace().collect();
@@ -10,7 +11,7 @@ pub fn parse_command(input: &str) -> (String, Vec<String>) {
 
 
 pub fn handle_command(command: String, args: &[String]) -> Result<String, String> {
-    if let Some(builtin) = BuiltinCommand::from_str(&command) {
+    if let Ok(builtin) = BuiltinCommand::from_str(&command) {
         builtin.execute(&args)
     } else {
         let external_command = ExternalCommand {command};

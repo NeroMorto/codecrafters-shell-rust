@@ -25,7 +25,7 @@ impl Executable for ExternalCommand {
 
 impl ExternalCommand {
     fn search_in_path_env(&self) -> Result<(), String> {
-        let path_env = std::env::var("PATH").unwrap();
+        let path_env = std::env::var("PATH").map_err(|e|e.to_string())?;
         let paths = path_env.split(":");
         for path_dir in paths {
             let command_path = format!("{path_dir}/{command}", command = &self.command);
