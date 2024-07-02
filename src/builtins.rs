@@ -90,3 +90,31 @@ pub fn exit_command(args: &[String]) -> Result<String, String> {
     Ok("".to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_echo() {
+        let result = echo_command(["Hello,".into(), "world!".into()].as_ref()).unwrap();
+        assert_eq!(result, "Hello, world!");
+    }
+
+    #[test]
+    fn test_pwd() {
+        let result = pwd_command([].as_ref()).unwrap();
+        assert_eq!(result, format!("{}", env::current_dir().unwrap().display().to_string()));
+    }
+
+    #[test]
+    fn test_type_external_command() {
+        let result = type_command(["ls".into()].as_ref()).unwrap();
+        assert_eq!(result, "ls is /usr/bin/ls");
+    }
+
+    #[test]
+    fn test_type_internal_command() {
+        let result = type_command(["echo".into()].as_ref()).unwrap();
+        assert_eq!(result, "echo is a shell builtin");
+    }
+}
